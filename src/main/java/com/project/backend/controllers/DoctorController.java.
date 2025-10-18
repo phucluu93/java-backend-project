@@ -1,72 +1,71 @@
-// Đảm bảo package này khớp với cấu trúc thư mục của bạn
-package com.yourproject.backend.controllers;
+package com.yourproject.controllers; // Thay thế bằng package thực tế của bạn
 
-import com.yourproject.backend.models.Doctor;
-import com.yourproject.backend.services.DoctorService;
+import com.yourproject.models.Doctor; // Giả sử Doctor.java nằm trong package models
+import com.yourproject.services.DoctorService; // Giả sử bạn có lớp DoctorService
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 /**
- * Controller xử lý các yêu cầu liên quan đến Bác sĩ (Doctor).
+ * Controller chịu trách nhiệm xử lý các yêu cầu liên quan đến Bác sĩ (Doctor).
+ * Sử dụng kiến trúc RESTful API.
  */
-@RestController
-@RequestMapping("/api/doctors") // Base URL cho tất cả các endpoint trong controller này
+@RestController // Đánh dấu đây là một Controller xử lý RESTful API
+@RequestMapping("/api/doctors") // Định nghĩa đường dẫn cơ sở cho Controller này
 public class DoctorController {
 
     private final DoctorService doctorService;
 
-    // Inject DoctorService vào Controller
+    // Sử dụng Dependency Injection (DI) để tiêm DoctorService
     @Autowired
     public DoctorController(DoctorService doctorService) {
         this.doctorService = doctorService;
     }
 
-    // Endpoint để lấy tất cả các bác sĩ
-    // Ví dụ: GET /api/doctors
+    // API để lấy danh sách tất cả Bác sĩ
     @GetMapping
     public ResponseEntity<List<Doctor>> getAllDoctors() {
-        List<Doctor> doctors = doctorService.findAllDoctors();
-        return ResponseEntity.ok(doctors);
+        List<Doctor> doctors = doctorService.findAll();
+        return new ResponseEntity<>(doctors, HttpStatus.OK);
     }
 
-    // Endpoint để lấy một bác sĩ theo ID
-    // Ví dụ: GET /api/doctors/123
+    // API để lấy thông tin một Bác sĩ theo ID
     @GetMapping("/{id}")
-    public ResponseEntity<Doctor> getDoctorById(@PathVariable Long id) {
-        // Sử dụng orElseThrow để trả về 404 nếu không tìm thấy
-        Doctor doctor = doctorService.findDoctorById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Doctor not found with id: " + id));
-        return ResponseEntity.ok(doctor);
+    public ResponseEntity<Doctor> getDoctorById(@PathVariable("id") int id) {
+        Doctor doctor = doctorService.findById(id);
+        // Tùy chọn: Thêm logic kiểm tra null nếu không tìm thấy
+        if (doctor != null) {
+            return new ResponseEntity<>(doctor, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
     }
 
-    // Endpoint để thêm bác sĩ mới
-    // Ví dụ: POST /api/doctors
+    // API để thêm một Bác sĩ mới
     @PostMapping
-    public ResponseEntity<Doctor> createDoctor(@RequestBody Doctor doctor) {
-        Doctor savedDoctor = doctorService.saveDoctor(doctor);
-        // Trả về 201 Created
-        return ResponseEntity.status(201).body(savedDoctor);
+    public ResponseEntity<Doctor> addDoctor(@RequestBody Doctor doctor) {
+        Doctor newDoctor = doctorService.save(doctor);
+        return new ResponseEntity<>(newDoctor, HttpStatus.CREATED);
     }
 
-    // Endpoint để cập nhật thông tin bác sĩ
-    // Ví dụ: PUT /api/doctors/123
+    // API để cập nhật thông tin Bác sĩ
     @PutMapping("/{id}")
-    public ResponseEntity<Doctor> updateDoctor(@PathVariable Long id, @RequestBody Doctor doctorDetails) {
-        Doctor updatedDoctor = doctorService.updateDoctor(id, doctorDetails);
-        return ResponseEntity.ok(updatedDoctor);
+    public ResponseEntity<Doctor> updateDoctor(@PathVariable("id") int id, @RequestBody Doctor doctor) {
+        Doctor updatedDoctor = doctorService.update(id, doctor);
+        if (updatedDoctor != null) {
+            return new ResponseEntity<>(updatedDoctor, HttpStatus.OK);
+        } else {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
     }
 
-    // Endpoint để xóa bác sĩ
-    // Ví dụ: DELETE /api/doctors/123
+    // API để xóa một Bác sĩ
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteDoctor(@PathVariable Long id) {
-        doctorService.deleteDoctor(id);
-        // Trả về 204 No Content
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> deleteDoctor(@PathVariable("id") int id) {
+        doctorService.delete(id);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT); // Mã 204 No Content
     }
-
-    // Bạn có thể cần thêm một lớp ResourceNotFoundException tùy chỉnh cho lỗi 404
 }
-// Lưu ý: Bạn cần có các lớp Model (Doctor), Repository và Service (DoctorService) tương ứng.
