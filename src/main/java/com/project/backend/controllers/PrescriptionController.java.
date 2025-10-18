@@ -1,0 +1,77 @@
+// Đảm bảo package này khớp với cấu trúc thư mục của bạn
+package com.yourproject.backend.controllers;
+
+import com.yourproject.backend.models.Prescription;
+import com.yourproject.backend.services.PrescriptionService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+
+/**
+ * Controller xử lý các yêu cầu liên quan đến Đơn thuốc (Prescription).
+ */
+@RestController
+@RequestMapping("/api/prescriptions") // Base URL cho tất cả các endpoint này
+public class PrescriptionController {
+
+    private final PrescriptionService prescriptionService;
+
+    // Inject PrescriptionService
+    @Autowired
+    public PrescriptionController(PrescriptionService prescriptionService) {
+        this.prescriptionService = prescriptionService;
+    }
+
+    // Endpoint để tạo đơn thuốc mới
+    // Ví dụ: POST /api/prescriptions
+    @PostMapping
+    public ResponseEntity<Prescription> createPrescription(@RequestBody Prescription prescription) {
+        Prescription savedPrescription = prescriptionService.savePrescription(prescription);
+        // Trả về 201 Created
+        return ResponseEntity.status(201).body(savedPrescription);
+    }
+
+    // Endpoint để lấy tất cả đơn thuốc
+    // Ví dụ: GET /api/prescriptions
+    @GetMapping
+    public ResponseEntity<List<Prescription>> getAllPrescriptions() {
+        List<Prescription> prescriptions = prescriptionService.findAllPrescriptions();
+        return ResponseEntity.ok(prescriptions);
+    }
+
+    // Endpoint để lấy đơn thuốc theo ID
+    // Ví dụ: GET /api/prescriptions/456
+    @GetMapping("/{id}")
+    public ResponseEntity<Prescription> getPrescriptionById(@PathVariable Long id) {
+        Prescription prescription = prescriptionService.findPrescriptionById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Prescription not found with id: " + id));
+        return ResponseEntity.ok(prescription);
+    }
+
+    // Endpoint để lấy tất cả đơn thuốc cho một bệnh nhân (Patient)
+    // Ví dụ: GET /api/prescriptions/patient/101
+    @GetMapping("/patient/{patientId}")
+    public ResponseEntity<List<Prescription>> getPrescriptionsByPatientId(@PathVariable Long patientId) {
+        List<Prescription> prescriptions = prescriptionService.findPrescriptionsByPatientId(patientId);
+        return ResponseEntity.ok(prescriptions);
+    }
+
+    // Endpoint để cập nhật đơn thuốc
+    // Ví dụ: PUT /api/prescriptions/456
+    @PutMapping("/{id}")
+    public ResponseEntity<Prescription> updatePrescription(@PathVariable Long id, @RequestBody Prescription prescriptionDetails) {
+        Prescription updatedPrescription = prescriptionService.updatePrescription(id, prescriptionDetails);
+        return ResponseEntity.ok(updatedPrescription);
+    }
+
+    // Endpoint để xóa đơn thuốc
+    // Ví dụ: DELETE /api/prescriptions/456
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletePrescription(@PathVariable Long id) {
+        prescriptionService.deletePrescription(id);
+        // Trả về 204 No Content
+        return ResponseEntity.noContent().build();
+    }
+}
+// Lưu ý: Bạn cần có các lớp Model (Prescription), Repository và Service (PrescriptionService) tương ứng.
