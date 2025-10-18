@@ -6,40 +6,36 @@ import java.util.ArrayList;
 import java.time.LocalDateTime;
 
 /**
- * Lớp Doctor đại diện cho một Bác sĩ trong hệ thống.
- * Đã được cấu hình là một JPA Entity.
+ * Lớp Doctor đã được cấu hình là một JPA Entity hợp lệ.
+ * Đã bổ sung các chú thích JPA bắt buộc và trường khóa chính (id).
  */
-@Entity // 1. Bổ sung chú thích @Entity
-@Table(name = "doctors") // Tùy chọn: Đặt tên bảng trong cơ sở dữ liệu
+@Entity // BẮT BUỘC: Đánh dấu là thực thể JPA
 public class Doctor {
 
-    // 2 & 3. Bổ sung Khóa chính (Primary Key) theo yêu cầu
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id; 
+    // BẮT BUỘC: Khóa chính (Primary Key)
+    @Id // Đánh dấu là khóa chính
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // Thiết lập tự động tăng
+    private Long id; // BẮT BUỘC: Kiểu Long theo yêu cầu
 
     private String name;
     private String specialty;
 
-    // 4. Bổ sung trường 'availableTimes' kiểu List<LocalDateTime>
-    // Sử dụng @ElementCollection để lưu trữ danh sách các phần tử này trong một bảng riêng
+    // Trường 'availableTimes' bị thiếu (Đã sửa ở hướng dẫn trước, nhưng tôi thêm lại)
     @ElementCollection 
     @CollectionTable(name = "doctor_available_times", joinColumns = @JoinColumn(name = "doctor_id"))
     private List<LocalDateTime> availableTimes = new ArrayList<>();
 
-    // Constructors
+    // Constructor mặc định (bắt buộc cho JPA)
     public Doctor() {
-        // Constructor mặc định là bắt buộc cho JPA
     }
 
-    // Constructor có tham số (không cần id vì nó tự tạo)
+    // Constructor có tham số (tùy chọn)
     public Doctor(String name, String specialty) {
         this.name = name;
         this.specialty = specialty;
     }
 
-    // Getters và Setters cho tất cả các trường
-    // (Bắt buộc phải có cho JPA)
+    // Getters và Setters cho tất cả các trường (BẮT BUỘC cho JPA)
 
     public Long getId() {
         return id;
@@ -48,7 +44,8 @@ public class Doctor {
     public void setId(Long id) {
         this.id = id;
     }
-
+    
+    // Các getters/setters còn lại... (Bạn phải tự bổ sung hoặc dùng IDE tạo tự động)
     public String getName() {
         return name;
     }
@@ -56,7 +53,7 @@ public class Doctor {
     public void setName(String name) {
         this.name = name;
     }
-
+    
     public String getSpecialty() {
         return specialty;
     }
@@ -65,7 +62,6 @@ public class Doctor {
         this.specialty = specialty;
     }
     
-    // Getters/Setters cho availableTimes
     public List<LocalDateTime> getAvailableTimes() {
         return availableTimes;
     }
