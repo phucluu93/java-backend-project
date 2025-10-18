@@ -1,69 +1,103 @@
-package com.project.backend.controllers; // THAY ĐỔI: Tên package thực tế của bạn
+package com.project.backend.controllers;
 
-import com.project.backend.models.Doctor; 
-import org.springframework.beans.factory.annotation.Autowired;
+import com.project.backend.models.Doctor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
-import java.util.Collections; 
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
 
 /**
- * Lớp điều khiển RESTful API cho đối tượng Bác sĩ, đã bổ sung phương thức kiểm tra khả dụng.
+ * RESTful API controller for managing Doctor-related operations.
+ * Provides endpoints for retrieving doctor availability and other CRUD operations.
  */
-@RestController 
-@RequestMapping("/api/doctors") 
+@RestController
+@RequestMapping("/api/doctors")
 public class DoctorController {
 
-    // (Giữ nguyên cấu trúc nếu bạn đang sử dụng DI)
-    // @Autowired
-    // public DoctorController(DoctorService doctorService) { ... }
+    // Simulated service for token validation (replace with actual implementation)
+    private final SecurityService securityService = new SecurityService(); // NEW: Mock service
 
     public DoctorController() {
     }
 
-    // API BỊ THIẾU: Lấy thông tin khả dụng của Bác sĩ
-    // Đây là phương thức được yêu cầu để vượt qua bài kiểm tra Q5.
-    @GetMapping("/availability")
+    /**
+     * Retrieves the availability of a doctor based on user role, doctor ID, date, and token.
+     * @param userRole The role of the user requesting the availability.
+     * @param doctorId The ID of the doctor.
+     * @param date The date to check availability.
+     * @param token The security token for authentication.
+     * @return A ResponseEntity containing a list of available dates or an error status.
+     */
+    @GetMapping("/availability/{userRole}/{doctorId}/{date}/{token}")
     public ResponseEntity<List<LocalDate>> getDoctorAvailability(
-        @RequestParam("role") String userRole, // Tham số Vai trò người dùng
-        @RequestParam("doctorId") Long doctorId, // Tham số ID Bác sĩ
-        @RequestParam("date") LocalDate date, // Tham số Ngày
-        @RequestParam("token") String token // Tham số Token (cho xác thực)
-    ) {
-        // --- LOGIC XỬ LÝ (Mô phỏng) ---
-        // 1. Kiểm tra Token và Vai trò người dùng (userRole)
-        // 2. Gọi DoctorService để truy vấn lịch trống của doctorId vào ngày date
-        
-        System.out.println("Kiểm tra khả dụng cho ID: " + doctorId + " vào ngày: " + date);
-        
-        // Trả về một danh sách rỗng hoặc danh sách các giờ có sẵn
+            @PathVariable("userRole") String userRole,
+            @PathVariable("doctorId") Long doctorId,
+            @PathVariable("date") LocalDate date,
+            @PathVariable("token") String token) {
+
+        // NEW: Validate token before proceeding
+        if (!securityService.isValidToken(token)) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
+        // NEW: Validate user role (example check)
+        if (!"doctor".equals(userRole) && !"admin".equals(userRole)) {
+            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+        }
+
+        // Simulate logic to check doctor availability (replace with actual service call)
+        System.out.println("Checking availability for doctorId: " + doctorId + " on date: " + date);
+        // In a real scenario, this would call a service to fetch availability
         return new ResponseEntity<>(Collections.emptyList(), HttpStatus.OK);
     }
 
-
-    // API 1: Lấy danh sách tất cả Bác sĩ (Giữ nguyên hoặc chỉnh sửa nếu cần)
+    /**
+     * Retrieves a list of all doctors.
+     * @return A ResponseEntity containing a list of Doctor objects.
+     */
     @GetMapping
     public ResponseEntity<List<Doctor>> getAllDoctors() {
         return new ResponseEntity<>(Collections.emptyList(), HttpStatus.OK);
     }
-    
-    // API 2: Thêm Bác sĩ mới (Giữ nguyên hoặc chỉnh sửa nếu cần)
+
+    /**
+     * Adds a new doctor to the system.
+     * @param doctor The Doctor object to be added.
+     * @return A ResponseEntity with the created Doctor object.
+     */
     @PostMapping
     public ResponseEntity<Doctor> addDoctor(@RequestBody Doctor doctor) {
         return new ResponseEntity<>(doctor, HttpStatus.CREATED);
     }
-    
-    // API 3: Lấy Bác sĩ theo ID (Giữ nguyên hoặc chỉnh sửa nếu cần)
+
+    /**
+     * Retrieves a doctor by their ID.
+     * @param id The ID of the doctor to retrieve.
+     * @return A ResponseEntity with the Doctor object or NOT_FOUND status.
+     */
     @GetMapping("/{id}")
     public ResponseEntity<Doctor> getDoctorById(@PathVariable("id") Long id) {
-        return new ResponseEntity<>(HttpStatus.NOT_FOUND); 
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
     }
-    
-    // API 4: Cập nhật Bác sĩ (Giữ nguyên hoặc chỉnh sửa nếu cần)
+
+    /**
+     * Updates an existing doctor's details.
+     * @param id The ID of the doctor to update.
+     * @param doctor The updated Doctor object.
+     * @return A ResponseEntity with the updated Doctor object.
+     */
     @PutMapping("/{id}")
     public ResponseEntity<Doctor> updateDoctor(@PathVariable("id") Long id, @RequestBody Doctor doctor) {
-        return new ResponseEntity<>(doctor, HttpStatus.OK); 
+        return new ResponseEntity<>(doctor, HttpStatus.OK);
+    }
+}
+
+// NEW: Mock SecurityService class for token validation
+class SecurityService {
+    public boolean isValidToken(String token) {
+        // Simulated token validation (replace with real logic, e.g., JWT validation)
+        return token != null && token.equals("valid-token-123"); // Example valid token
     }
 }
