@@ -1,11 +1,11 @@
-package com.yourproject.backend.services; // Đảm bảo khớp với cấu trúc thư mục của bạn
+package com.yourproject.backend.services;
 
 import com.yourproject.backend.models.Appointment;
 import com.yourproject.backend.repositories.AppointmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import jakarta.persistence.EntityNotFoundException; // NEW: Import exception
+import jakarta.persistence.EntityNotFoundException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -27,7 +27,7 @@ public class AppointmentService {
      * Retrieves all appointments.
      * @return A list of all Appointment objects.
      */
-    @Transactional(readOnly = true) // NEW: Optimize for read-only operations
+    @Transactional(readOnly = true)
     public List<Appointment> findAllAppointments() {
         return appointmentRepository.findAll();
     }
@@ -46,10 +46,14 @@ public class AppointmentService {
      * Saves or creates a new appointment with availability check.
      * @param appointment The Appointment object to save.
      * @return The saved Appointment object.
+     * @throws IllegalArgumentException if appointment or doctor is null.
      * @throws IllegalStateException if the appointment slot is already taken.
      */
     @Transactional
     public Appointment saveAppointment(Appointment appointment) {
+        if (appointment == null || appointment.getDoctor() == null) {
+            throw new IllegalArgumentException("Appointment or Doctor cannot be null");
+        }
         if (isAppointmentSlotAvailable(appointment.getDoctor().getId(), appointment.getAppointmentTime())) {
             return appointmentRepository.save(appointment);
         } else {
@@ -58,37 +62,40 @@ public class AppointmentService {
     }
 
     /**
-     * Updates an existing appointment's details.
+     * Updates an existing appointment's details with availability check.
      * @param id The ID of the appointment to update.
      * @param appointmentDetails The updated Appointment object.
      * @return The updated Appointment object.
      * @throws EntityNotFoundException if the appointment is not found.
+     * @throws IllegalStateException if the new time conflicts with existing slots.
      */
     @Transactional
     public Appointment updateAppointment(Long id, Appointment appointmentDetails) {
         Appointment existingAppointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Appointment not found with id: " + id));
-
-        // Update fields
+        if (!isAppointmentSlotAvailable(existingAppointment.getDoctor().getId(), appointmentDetails.getAppointmentTime())) {
+            throw new IllegalStateException("The new appointment time conflicts with existing slots.");
+        }
         existingAppointment.setAppointmentTime(appointmentDetails.getAppointmentTime());
         existingAppointment.setNotes(appointmentDetails.getNotes());
         existingAppointment.setStatus(appointmentDetails.getStatus());
-        existingAppointment.setPatient(appointmentDetails.getPatient()); // NEW: Update patient if needed
-        existingAppointment.setDoctor(appointmentDetails.getDoctor()); // NEW: Update doctor if needed
-
+        existingAppointment.setPatient(appointmentDetails.getPatient());
+        existingAppointment.setDoctor(appointmentDetails.getDoctor());
         return appointmentRepository.save(existingAppointment);
     }
 
     /**
      * Deletes an appointment by its ID.
      * @param id The ID of the appointment to delete.
+     * @throws EntityNotFoundException if the appointment is not found.
      */
     @Transactional
     public void deleteAppointment(Long id) {
+        if (!appointmentRepository.existsById(id)) {
+            throw new EntityNotFoundException("Appointment not found with id: " + id);
+        }
         appointmentRepository.deleteById(id);
     }
-
-    // --- Business Logic Methods ---
 
     /**
      * Checks if an appointment slot is available for a given doctor and time.
@@ -98,17 +105,15 @@ public class AppointmentService {
      * @return true if the slot is available, false otherwise.
      */
     public boolean isAppointmentSlotAvailable(Long doctorId, LocalDateTime appointmentTime) {
+        if (doctorId == null || appointmentTime == null) return false;
         LocalDateTime startBuffer = appointmentTime.minusMinutes(30);
         LocalDateTime endBuffer = appointmentTime.plusMinutes(30);
-
-        // Query repository for conflicting appointments
         List<Appointment> conflictingAppointments = appointmentRepository
                 .findByDoctorIdAndAppointmentTimeBetween(doctorId, startBuffer, endBuffer);
-
-        return conflictingAppointments.isEmpty();
+        return conflictingAppointments.stream()
+                .noneMatch(a -> !a.getId().equals(appointment.getId())); // Ignore current appointment if updating
     }
 
-    // NEW: Additional useful methods (optional based on requirements)
     /**
      * Finds all appointments for a specific doctor.
      * @param doctorId The ID of the doctor.
@@ -129,16 +134,4 @@ public class AppointmentService {
         LocalDateTime now = LocalDateTime.now();
         return appointmentRepository.findByPatientIdAndAppointmentTimeAfter(patientId, now);
     }
-}
-
-// NEW: Ensure AppointmentRepository has these custom methods
-// Example interface (to be implemented in your repository)
-interface AppointmentRepository {
-    List<Appointment> findAll();
-    Optional<Appointment> findById(Long id);
-    Appointment save(Appointment appointment);
-    void deleteById(Long id);
-    List<Appointment> findByDoctorIdAndAppointmentTimeBetween(Long doctorId, LocalDateTime start, LocalDateTime end);
-    List<Appointment> findByDoctorId(Long doctorId);
-    List<Appointment> findByPatientIdAndAppointmentTimeAfter(Long patientId, LocalDateTime dateTime);
 }
