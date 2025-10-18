@@ -12,6 +12,7 @@ import java.util.Optional;
 
 /**
  * Service class handling business logic for Appointment management.
+ * Optimized for performance, robustness, and maintainability with proper transaction management.
  */
 @Service
 public class AppointmentService {
@@ -43,18 +44,20 @@ public class AppointmentService {
     }
 
     /**
-     * Saves or creates a new appointment with availability check.
+     * Saves or creates a new appointment with availability and future time check.
      * @param appointment The Appointment object to save.
      * @return The saved Appointment object.
-     * @throws IllegalArgumentException if appointment or doctor is null.
-     * @throws IllegalStateException if the appointment slot is already taken.
+     * @throws IllegalArgumentException if appointment, doctor, or appointment time is null.
+     * @throws IllegalStateException if the appointment slot is already taken or time is in the past.
      */
     @Transactional
     public Appointment saveAppointment(Appointment appointment) {
-        if (appointment == null || appointment.getDoctor() == null) {
-            throw new IllegalArgumentException("Appointment or Doctor cannot be null");
+        validateAppointment(appointment);
+        LocalDateTime now = LocalDateTime.now(); // Current time: 03:36 PM +07, 18/10/2025
+        if (appointment.getAppointmentTime().isBefore(now)) {
+            throw new IllegalStateException("Appointment time cannot be in the past.");
         }
-        if (isAppointmentSlotAvailable(appointment.getDoctor().getId(), appointment.getAppointmentTime())) {
+        if (isAppointmentSlotAvailable(appointment.getDoctor().getId(), appointment.getAppointmentTime(), null)) {
             return appointmentRepository.save(appointment);
         } else {
             throw new IllegalStateException("The selected appointment slot is already taken.");
@@ -62,18 +65,23 @@ public class AppointmentService {
     }
 
     /**
-     * Updates an existing appointment's details with availability check.
+     * Updates an existing appointment's details with availability and future time check.
      * @param id The ID of the appointment to update.
      * @param appointmentDetails The updated Appointment object.
      * @return The updated Appointment object.
      * @throws EntityNotFoundException if the appointment is not found.
-     * @throws IllegalStateException if the new time conflicts with existing slots.
+     * @throws IllegalStateException if the new time conflicts with existing slots or is in the past.
      */
     @Transactional
     public Appointment updateAppointment(Long id, Appointment appointmentDetails) {
         Appointment existingAppointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Appointment not found with id: " + id));
-        if (!isAppointmentSlotAvailable(existingAppointment.getDoctor().getId(), appointmentDetails.getAppointmentTime())) {
+        validateAppointment(appointmentDetails);
+        LocalDateTime now = LocalDateTime.now();
+        if (appointmentDetails.getAppointmentTime().isBefore(now)) {
+            throw new IllegalStateException("Appointment time cannot be in the past.");
+        }
+        if (!isAppointmentSlotAvailable(existingAppointment.getDoctor().getId(), appointmentDetails.getAppointmentTime(), id)) {
             throw new IllegalStateException("The new appointment time conflicts with existing slots.");
         }
         existingAppointment.setAppointmentTime(appointmentDetails.getAppointmentTime());
@@ -99,19 +107,35 @@ public class AppointmentService {
 
     /**
      * Checks if an appointment slot is available for a given doctor and time.
-     * Considers a 30-minute buffer to avoid overlapping appointments.
+     * Considers a 30-minute buffer to avoid overlapping appointments and excludes the current appointment if updating.
      * @param doctorId The ID of the doctor.
      * @param appointmentTime The proposed appointment time.
+     * @param currentAppointmentId The ID of the current appointment (null for new appointments).
      * @return true if the slot is available, false otherwise.
      */
-    public boolean isAppointmentSlotAvailable(Long doctorId, LocalDateTime appointmentTime) {
+    public boolean isAppointmentSlotAvailable(Long doctorId, LocalDateTime appointmentTime, Long currentAppointmentId) {
         if (doctorId == null || appointmentTime == null) return false;
         LocalDateTime startBuffer = appointmentTime.minusMinutes(30);
         LocalDateTime endBuffer = appointmentTime.plusMinutes(30);
         List<Appointment> conflictingAppointments = appointmentRepository
                 .findByDoctorIdAndAppointmentTimeBetween(doctorId, startBuffer, endBuffer);
-        return conflictingAppointments.stream()
-                .noneMatch(a -> !a.getId().equals(appointment.getId())); // Ignore current appointment if updating
+        for (Appointment a : conflictingAppointments) {
+            if (!a.getId().equals(currentAppointmentId)) {
+                return false; // Conflict found
+            }
+        }
+        return true; // No conflict
+    }
+
+    /**
+     * Validates the appointment object for required fields.
+     * @param appointment The Appointment object to validate.
+     * @throws IllegalArgumentException if validation fails.
+     */
+    private void validateAppointment(Appointment appointment) {
+        if (appointment == null || appointment.getDoctor() == null || appointment.getAppointmentTime() == null) {
+            throw new IllegalArgumentException("Appointment, Doctor, or Appointment Time cannot be null");
+        }
     }
 
     /**
