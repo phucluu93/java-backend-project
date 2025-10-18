@@ -6,7 +6,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * RESTful API controller for managing Doctor-related operations.
@@ -16,41 +18,52 @@ import java.util.List;
 @RequestMapping("/api/doctors")
 public class DoctorController {
 
-    // Simulated service for token validation (replace with actual implementation)
-    private final SecurityService securityService = new SecurityService(); // NEW: Mock service
+    // Simulated service for token validation (replace with actual implementation, e.g., @Autowired SecurityService)
+    private final SecurityService securityService = new SecurityService();
 
     public DoctorController() {
     }
 
     /**
-     * Retrieves the availability of a doctor based on user role, doctor ID, date, and token.
+     * Retrieves the availability of a doctor based on user role, doctor ID, date, and token using path variables.
      * @param userRole The role of the user requesting the availability.
      * @param doctorId The ID of the doctor.
      * @param date The date to check availability.
      * @param token The security token for authentication.
-     * @return A ResponseEntity containing a list of available dates or an error status.
+     * @return A ResponseEntity containing a structured map response with availability details or an error status.
      */
     @GetMapping("/availability/{userRole}/{doctorId}/{date}/{token}")
-    public ResponseEntity<List<LocalDate>> getDoctorAvailability(
+    public ResponseEntity<Map<String, Object>> getDoctorAvailability(
             @PathVariable("userRole") String userRole,
             @PathVariable("doctorId") Long doctorId,
             @PathVariable("date") LocalDate date,
             @PathVariable("token") String token) {
 
-        // NEW: Validate token before proceeding
+        // Validate token
         if (!securityService.isValidToken(token)) {
-            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid token");
+            return new ResponseEntity<>(errorResponse, HttpStatus.UNAUTHORIZED);
         }
 
-        // NEW: Validate user role (example check)
+        // Validate user role (example: only allow certain roles)
         if (!"doctor".equals(userRole) && !"admin".equals(userRole)) {
-            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Forbidden access");
+            return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
         }
 
-        // Simulate logic to check doctor availability (replace with actual service call)
-        System.out.println("Checking availability for doctorId: " + doctorId + " on date: " + date);
-        // In a real scenario, this would call a service to fetch availability
-        return new ResponseEntity<>(Collections.emptyList(), HttpStatus.OK);
+        // Simulate logic to check availability (replace with actual service call)
+        List<LocalDate> availableDates = Collections.emptyList(); // Placeholder for real data
+
+        // Structured response
+        Map<String, Object> response = new HashMap<>();
+        response.put("doctorId", doctorId);
+        response.put("date", date);
+        response.put("availableDates", availableDates);
+        response.put("message", "Availability checked successfully");
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     /**
@@ -94,10 +107,10 @@ public class DoctorController {
     }
 }
 
-// NEW: Mock SecurityService class for token validation
+// Mock SecurityService class for token validation (replace with real implementation)
 class SecurityService {
     public boolean isValidToken(String token) {
-        // Simulated token validation (replace with real logic, e.g., JWT validation)
-        return token != null && token.equals("valid-token-123"); // Example valid token
+        // Simulated validation logic (e.g., check against a database or JWT decoding)
+        return token != null && !token.isEmpty(); // Simple check; enhance as needed
     }
 }
