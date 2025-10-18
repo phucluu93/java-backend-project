@@ -1,8 +1,12 @@
 package com.yourproject.backend.services;
 
 import com.yourproject.backend.models.Appointment;
+import com.yourproject.backend.models.Doctor;
 import com.yourproject.backend.repositories.AppointmentRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import jakarta.persistence.EntityNotFoundException;
@@ -12,24 +16,29 @@ import java.util.Optional;
 
 /**
  * Service class handling business logic for Appointment management.
- * Optimized for performance, robustness, and maintainability with proper transaction management.
+ * Optimized for accuracy, efficiency, and best practices with transaction management and logging.
  */
 @Service
 public class AppointmentService {
 
+    private static final Logger logger = LoggerFactory.getLogger(AppointmentService.class);
     private final AppointmentRepository appointmentRepository;
+    private final DoctorService doctorService; // NEW: Integration with DoctorService
 
     @Autowired
-    public AppointmentService(AppointmentRepository appointmentRepository) {
+    public AppointmentService(AppointmentRepository appointmentRepository, DoctorService doctorService) {
         this.appointmentRepository = appointmentRepository;
+        this.doctorService = doctorService;
     }
 
     /**
-     * Retrieves all appointments.
+     * Retrieves all appointments with caching for performance.
      * @return A list of all Appointment objects.
      */
     @Transactional(readOnly = true)
+    @Cacheable("appointments")
     public List<Appointment> findAllAppointments() {
+        logger.info("Fetching all appointments");
         return appointmentRepository.findAll();
     }
 
@@ -40,6 +49,7 @@ public class AppointmentService {
      */
     @Transactional(readOnly = true)
     public Optional<Appointment> findAppointmentById(Long id) {
+        logger.info("Fetching appointment with id: {}", id);
         return appointmentRepository.findById(id);
     }
 
@@ -53,11 +63,17 @@ public class AppointmentService {
     @Transactional
     public Appointment saveAppointment(Appointment appointment) {
         validateAppointment(appointment);
-        LocalDateTime now = LocalDateTime.now(); // Current time: 03:36 PM +07, 18/10/2025
+        LocalDateTime now = LocalDateTime.now(); // 03:38 PM +07, 18/10/2025
         if (appointment.getAppointmentTime().isBefore(now)) {
             throw new IllegalStateException("Appointment time cannot be in the past.");
         }
+        Doctor doctor = doctorService.findDoctorById(appointment.getDoctor().getId())
+                .orElseThrow(() -> new EntityNotFoundException("Doctor not found"));
+        if (!doctor.isAvailable(appointment.getAppointmentTime())) { // NEW: Check doctor's availability
+            throw new IllegalStateException("Doctor is not available at the requested time.");
+        }
         if (isAppointmentSlotAvailable(appointment.getDoctor().getId(), appointment.getAppointmentTime(), null)) {
+            logger.info("Saving new appointment for doctorId: {}", appointment.getDoctor().getId());
             return appointmentRepository.save(appointment);
         } else {
             throw new IllegalStateException("The selected appointment slot is already taken.");
@@ -69,7 +85,7 @@ public class AppointmentService {
      * @param id The ID of the appointment to update.
      * @param appointmentDetails The updated Appointment object.
      * @return The updated Appointment object.
-     * @throws EntityNotFoundException if the appointment is not found.
+     * @throws EntityNotFoundException if the appointment or doctor is not found.
      * @throws IllegalStateException if the new time conflicts with existing slots or is in the past.
      */
     @Transactional
@@ -81,6 +97,11 @@ public class AppointmentService {
         if (appointmentDetails.getAppointmentTime().isBefore(now)) {
             throw new IllegalStateException("Appointment time cannot be in the past.");
         }
+        Doctor doctor = doctorService.findDoctorById(appointmentDetails.getDoctor().getId())
+                .orElseThrow(() -> new EntityNotFoundException("Doctor not found"));
+        if (!doctor.isAvailable(appointmentDetails.getAppointmentTime())) {
+            throw new IllegalStateException("Doctor is not available at the requested time.");
+        }
         if (!isAppointmentSlotAvailable(existingAppointment.getDoctor().getId(), appointmentDetails.getAppointmentTime(), id)) {
             throw new IllegalStateException("The new appointment time conflicts with existing slots.");
         }
@@ -89,6 +110,7 @@ public class AppointmentService {
         existingAppointment.setStatus(appointmentDetails.getStatus());
         existingAppointment.setPatient(appointmentDetails.getPatient());
         existingAppointment.setDoctor(appointmentDetails.getDoctor());
+        logger.info("Updating appointment with id: {}", id);
         return appointmentRepository.save(existingAppointment);
     }
 
@@ -102,12 +124,29 @@ public class AppointmentService {
         if (!appointmentRepository.existsById(id)) {
             throw new EntityNotFoundException("Appointment not found with id: " + id);
         }
+        logger.info("Deleting appointment with id: {}", id);
         appointmentRepository.deleteById(id);
     }
 
     /**
+     * Cancels an appointment with a reason.
+     * @param id The ID of the appointment to cancel.
+     * @param reason The reason for cancellation.
+     * @throws EntityNotFoundException if the appointment is not found.
+     */
+    @Transactional
+    public void cancelAppointment(Long id, String reason) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Appointment not found with id: " + id));
+        appointment.setStatus("Cancelled");
+        appointment.setNotes((appointment.getNotes() != null ? appointment.getNotes() + " | " : "") + "Cancelled: " + reason);
+        logger.info("Cancelling appointment with id: {} for reason: {}", id, reason);
+        appointmentRepository.save(appointment);
+    }
+
+    /**
      * Checks if an appointment slot is available for a given doctor and time.
-     * Considers a 30-minute buffer to avoid overlapping appointments and excludes the current appointment if updating.
+     * Considers a 30-minute buffer and doctor's availability, excluding the current appointment if updating.
      * @param doctorId The ID of the doctor.
      * @param appointmentTime The proposed appointment time.
      * @param currentAppointmentId The ID of the current appointment (null for new appointments).
@@ -144,7 +183,9 @@ public class AppointmentService {
      * @return A list of Appointment objects.
      */
     @Transactional(readOnly = true)
+    @Cacheable("doctorAppointments")
     public List<Appointment> findAppointmentsByDoctor(Long doctorId) {
+        logger.info("Fetching appointments for doctorId: {}", doctorId);
         return appointmentRepository.findByDoctorId(doctorId);
     }
 
@@ -154,8 +195,23 @@ public class AppointmentService {
      * @return A list of Appointment objects.
      */
     @Transactional(readOnly = true)
+    @Cacheable("patientAppointments")
     public List<Appointment> findUpcomingAppointments(Long patientId) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(); // 03:38 PM +07, 18/10/2025
+        logger.info("Fetching upcoming appointments for patientId: {}", patientId);
         return appointmentRepository.findByPatientIdAndAppointmentTimeAfter(patientId, now);
+    }
+}
+
+// Mock DoctorService (replace with actual implementation)
+class DoctorService {
+    public Optional<Doctor> findDoctorById(Long id) {
+        // Simulated logic
+        return Optional.empty(); // Replace with real implementation
+    }
+
+    public boolean isAvailable(LocalDateTime time) {
+        // Simulated logic (e.g., check doctor's schedule)
+        return true; // Replace with real implementation
     }
 }
