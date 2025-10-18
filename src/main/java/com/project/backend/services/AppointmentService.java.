@@ -1,20 +1,19 @@
-// Đảm bảo package này khớp với cấu trúc thư mục của bạn
-package com.yourproject.backend.services;
+package com.yourproject.backend.services; // Đảm bảo khớp với cấu trúc thư mục của bạn
 
 import com.yourproject.backend.models.Appointment;
 import com.yourproject.backend.repositories.AppointmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.EntityNotFoundException; // NEW: Import exception
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 /**
- * Lớp Service xử lý logic nghiệp vụ cho cuộc hẹn (Appointment).
+ * Service class handling business logic for Appointment management.
  */
 @Service
-@Transactional // Đảm bảo các phương thức được thực hiện trong một giao dịch (transaction)
 public class AppointmentService {
 
     private final AppointmentRepository appointmentRepository;
@@ -25,26 +24,33 @@ public class AppointmentService {
     }
 
     /**
-     * Lấy tất cả các cuộc hẹn.
+     * Retrieves all appointments.
+     * @return A list of all Appointment objects.
      */
+    @Transactional(readOnly = true) // NEW: Optimize for read-only operations
     public List<Appointment> findAllAppointments() {
         return appointmentRepository.findAll();
     }
 
     /**
-     * Lấy một cuộc hẹn theo ID.
+     * Retrieves an appointment by its ID.
+     * @param id The ID of the appointment to find.
+     * @return An Optional containing the Appointment, or empty if not found.
      */
+    @Transactional(readOnly = true)
     public Optional<Appointment> findAppointmentById(Long id) {
         return appointmentRepository.findById(id);
     }
 
     /**
-     * Lưu/Tạo một cuộc hẹn mới.
-     * Đây là nơi bạn đặt logic kiểm tra tính khả dụng của lịch (ví dụ: giờ đã được đặt chưa).
+     * Saves or creates a new appointment with availability check.
+     * @param appointment The Appointment object to save.
+     * @return The saved Appointment object.
+     * @throws IllegalStateException if the appointment slot is already taken.
      */
+    @Transactional
     public Appointment saveAppointment(Appointment appointment) {
-        // Ví dụ về Business Logic: Kiểm tra xem thời gian hẹn đã có sẵn chưa
-        if (isAppointmentSlotAvailable(appointment.getDoctorId(), appointment.getDateTime())) {
+        if (isAppointmentSlotAvailable(appointment.getDoctor().getId(), appointment.getAppointmentTime())) {
             return appointmentRepository.save(appointment);
         } else {
             throw new IllegalStateException("The selected appointment slot is already taken.");
@@ -52,23 +58,32 @@ public class AppointmentService {
     }
 
     /**
-     * Cập nhật thông tin cuộc hẹn.
+     * Updates an existing appointment's details.
+     * @param id The ID of the appointment to update.
+     * @param appointmentDetails The updated Appointment object.
+     * @return The updated Appointment object.
+     * @throws EntityNotFoundException if the appointment is not found.
      */
+    @Transactional
     public Appointment updateAppointment(Long id, Appointment appointmentDetails) {
         Appointment existingAppointment = appointmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found with id: " + id));
+                .orElseThrow(() -> new EntityNotFoundException("Appointment not found with id: " + id));
 
-        // Cập nhật các trường dữ liệu
-        existingAppointment.setDateTime(appointmentDetails.getDateTime());
+        // Update fields
+        existingAppointment.setAppointmentTime(appointmentDetails.getAppointmentTime());
+        existingAppointment.setNotes(appointmentDetails.getNotes());
         existingAppointment.setStatus(appointmentDetails.getStatus());
-        // ... (cập nhật các trường khác)
+        existingAppointment.setPatient(appointmentDetails.getPatient()); // NEW: Update patient if needed
+        existingAppointment.setDoctor(appointmentDetails.getDoctor()); // NEW: Update doctor if needed
 
         return appointmentRepository.save(existingAppointment);
     }
 
     /**
-     * Xóa cuộc hẹn.
+     * Deletes an appointment by its ID.
+     * @param id The ID of the appointment to delete.
      */
+    @Transactional
     public void deleteAppointment(Long id) {
         appointmentRepository.deleteById(id);
     }
@@ -76,17 +91,54 @@ public class AppointmentService {
     // --- Business Logic Methods ---
 
     /**
-     * Phương thức kiểm tra tính khả dụng của cuộc hẹn.
+     * Checks if an appointment slot is available for a given doctor and time.
+     * Considers a 30-minute buffer to avoid overlapping appointments.
+     * @param doctorId The ID of the doctor.
+     * @param appointmentTime The proposed appointment time.
+     * @return true if the slot is available, false otherwise.
      */
-    public boolean isAppointmentSlotAvailable(Long doctorId, LocalDateTime dateTime) {
-        // Thực hiện truy vấn Repository để kiểm tra xem có cuộc hẹn nào khác
-        // cho cùng một bác sĩ (doctorId) vào cùng một thời gian (dateTime) không.
-        // Đây chỉ là một placeholder, bạn cần viết logic truy vấn thực tế.
-        return appointmentRepository.findByDoctorIdAndDateTime(doctorId, dateTime).isEmpty();
+    public boolean isAppointmentSlotAvailable(Long doctorId, LocalDateTime appointmentTime) {
+        LocalDateTime startBuffer = appointmentTime.minusMinutes(30);
+        LocalDateTime endBuffer = appointmentTime.plusMinutes(30);
+
+        // Query repository for conflicting appointments
+        List<Appointment> conflictingAppointments = appointmentRepository
+                .findByDoctorIdAndAppointmentTimeBetween(doctorId, startBuffer, endBuffer);
+
+        return conflictingAppointments.isEmpty();
     }
 
-    // Bạn cũng có thể cần các phương thức khác như:
-    // - findAppointmentsByDoctor(Long doctorId)
-    // - findUpcomingAppointments(Long patientId)
+    // NEW: Additional useful methods (optional based on requirements)
+    /**
+     * Finds all appointments for a specific doctor.
+     * @param doctorId The ID of the doctor.
+     * @return A list of Appointment objects.
+     */
+    @Transactional(readOnly = true)
+    public List<Appointment> findAppointmentsByDoctor(Long doctorId) {
+        return appointmentRepository.findByDoctorId(doctorId);
+    }
+
+    /**
+     * Finds upcoming appointments for a specific patient.
+     * @param patientId The ID of the patient.
+     * @return A list of Appointment objects.
+     */
+    @Transactional(readOnly = true)
+    public List<Appointment> findUpcomingAppointments(Long patientId) {
+        LocalDateTime now = LocalDateTime.now();
+        return appointmentRepository.findByPatientIdAndAppointmentTimeAfter(patientId, now);
+    }
 }
-// Lưu ý: Bạn cần có các lớp Model (Appointment) và Repository (AppointmentRepository) tương ứng.
+
+// NEW: Ensure AppointmentRepository has these custom methods
+// Example interface (to be implemented in your repository)
+interface AppointmentRepository {
+    List<Appointment> findAll();
+    Optional<Appointment> findById(Long id);
+    Appointment save(Appointment appointment);
+    void deleteById(Long id);
+    List<Appointment> findByDoctorIdAndAppointmentTimeBetween(Long doctorId, LocalDateTime start, LocalDateTime end);
+    List<Appointment> findByDoctorId(Long doctorId);
+    List<Appointment> findByPatientIdAndAppointmentTimeAfter(Long patientId, LocalDateTime dateTime);
+}
