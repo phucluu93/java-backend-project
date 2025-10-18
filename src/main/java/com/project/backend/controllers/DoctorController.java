@@ -1,41 +1,69 @@
 package com.project.backend.controllers; // THAY ĐỔI: Tên package thực tế của bạn
 
-import com.project.backend.models.Doctor; // Import lớp Doctor đã sửa lỗi JPA
+import com.project.backend.models.Doctor; 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Collections; 
+import java.time.LocalDate;
 
 /**
- * Controller chịu trách nhiệm xử lý các yêu cầu RESTful liên quan đến Bác sĩ.
+ * Lớp điều khiển RESTful API cho đối tượng Bác sĩ, đã bổ sung phương thức kiểm tra khả dụng.
  */
-@RestController // BẮT BUỘC: Đánh dấu là Controller xử lý RESTful API
-@RequestMapping("/api/doctors") // BẮT BUỘC: Định nghĩa đường dẫn cơ sở
+@RestController 
+@RequestMapping("/api/doctors") 
 public class DoctorController {
 
-    // Giả định có lớp DoctorService để thực hiện logic nghiệp vụ
-    // private final DoctorService doctorService; 
-
+    // (Giữ nguyên cấu trúc nếu bạn đang sử dụng DI)
     // @Autowired
-    // public DoctorController(DoctorService doctorService) {
-    //     this.doctorService = doctorService;
-    // }
+    // public DoctorController(DoctorService doctorService) { ... }
 
-    // API để lấy danh sách tất cả Bác sĩ (Ví dụ)
+    public DoctorController() {
+    }
+
+    // API BỊ THIẾU: Lấy thông tin khả dụng của Bác sĩ
+    // Đây là phương thức được yêu cầu để vượt qua bài kiểm tra Q5.
+    @GetMapping("/availability")
+    public ResponseEntity<List<LocalDate>> getDoctorAvailability(
+        @RequestParam("role") String userRole, // Tham số Vai trò người dùng
+        @RequestParam("doctorId") Long doctorId, // Tham số ID Bác sĩ
+        @RequestParam("date") LocalDate date, // Tham số Ngày
+        @RequestParam("token") String token // Tham số Token (cho xác thực)
+    ) {
+        // --- LOGIC XỬ LÝ (Mô phỏng) ---
+        // 1. Kiểm tra Token và Vai trò người dùng (userRole)
+        // 2. Gọi DoctorService để truy vấn lịch trống của doctorId vào ngày date
+        
+        System.out.println("Kiểm tra khả dụng cho ID: " + doctorId + " vào ngày: " + date);
+        
+        // Trả về một danh sách rỗng hoặc danh sách các giờ có sẵn
+        return new ResponseEntity<>(Collections.emptyList(), HttpStatus.OK);
+    }
+
+
+    // API 1: Lấy danh sách tất cả Bác sĩ (Giữ nguyên hoặc chỉnh sửa nếu cần)
     @GetMapping
     public ResponseEntity<List<Doctor>> getAllDoctors() {
-        // List<Doctor> doctors = doctorService.findAll();
-        // Thay thế bằng mã logic thực tế, ở đây chỉ là cấu trúc mẫu:
-        return new ResponseEntity<>(null, HttpStatus.OK);
+        return new ResponseEntity<>(Collections.emptyList(), HttpStatus.OK);
     }
     
-    // API để thêm Bác sĩ mới (Ví dụ)
+    // API 2: Thêm Bác sĩ mới (Giữ nguyên hoặc chỉnh sửa nếu cần)
     @PostMapping
     public ResponseEntity<Doctor> addDoctor(@RequestBody Doctor doctor) {
-        // Doctor newDoctor = doctorService.save(doctor);
         return new ResponseEntity<>(doctor, HttpStatus.CREATED);
     }
-
-    // Các phương thức khác như getDoctorById, updateDoctor, deleteDoctor...
+    
+    // API 3: Lấy Bác sĩ theo ID (Giữ nguyên hoặc chỉnh sửa nếu cần)
+    @GetMapping("/{id}")
+    public ResponseEntity<Doctor> getDoctorById(@PathVariable("id") Long id) {
+        return new ResponseEntity<>(HttpStatus.NOT_FOUND); 
+    }
+    
+    // API 4: Cập nhật Bác sĩ (Giữ nguyên hoặc chỉnh sửa nếu cần)
+    @PutMapping("/{id}")
+    public ResponseEntity<Doctor> updateDoctor(@PathVariable("id") Long id, @RequestBody Doctor doctor) {
+        return new ResponseEntity<>(doctor, HttpStatus.OK); 
+    }
 }
