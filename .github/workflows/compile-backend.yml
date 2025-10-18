@@ -1,0 +1,45 @@
+name: Java CI/CD Backend
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    # Định nghĩa các biến môi trường cho Java
+    strategy:
+      matrix:
+        java-version: [ '17' ] # Sử dụng phiên bản Java 17
+
+    steps:
+    - name: 1. Checkout mã nguồn
+      uses: actions/checkout@v4
+      
+    - name: 2. Thiết lập Java
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ matrix.java-version }}
+        distribution: 'temurin'
+        cache: 'maven'
+
+    - name: 3. Biên dịch và Đóng gói (Build with Maven)
+      run: |
+        echo "Bắt đầu biên dịch ứng dụng Java backend..."
+        # Lệnh 'package' của Maven sẽ biên dịch code và chạy các unit test
+        mvn -B package --file pom.xml
+        echo "Biên dịch backend Java hoàn tất."
+
+    # Bước này có thể được thêm vào nếu cần lưu trữ artifact (ví dụ: file .jar)
+    # - name: 4. Upload build artifact
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: backend-jar
+    #     path: target/*.jar
+
+    - name: 5. Hoàn tất công việc CI
+      run: echo "Quy trình làm việc biên dịch backend đã hoàn thành thành công."
+    
