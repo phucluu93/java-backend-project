@@ -1,11 +1,13 @@
-package com.project.backend.models; // đổi lại cho khớp với package thực tế của bạn
+package com.project.backend.models;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
 /**
  * Lớp Appointment đại diện cho một cuộc hẹn giữa bệnh nhân và bác sĩ.
- * Được đánh dấu là một JPA Entity hợp lệ.
+ * Được đánh dấu là JPA Entity với quan hệ tới Doctor và Patient.
  */
 @Entity
 @Table(name = "appointments")
@@ -15,22 +17,29 @@ public class Appointment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Mối quan hệ với Doctor (nhiều cuộc hẹn có thể thuộc 1 bác sĩ)
+    // Quan hệ: Nhiều cuộc hẹn thuộc về 1 bác sĩ
     @ManyToOne
     @JoinColumn(name = "doctor_id", nullable = false)
     private Doctor doctor;
 
-    private String patientName;
+    // Quan hệ: Nhiều cuộc hẹn thuộc về 1 bệnh nhân
+    @ManyToOne
+    @JoinColumn(name = "patient_id", nullable = false)
+    private Patient patient;
+
+    @NotNull
+    @Future // đảm bảo thời gian cuộc hẹn nằm trong tương lai
     private LocalDateTime appointmentTime;
+
     private String notes;
 
     // Constructor mặc định (bắt buộc cho JPA)
     public Appointment() {}
 
     // Constructor đầy đủ
-    public Appointment(Doctor doctor, String patientName, LocalDateTime appointmentTime, String notes) {
+    public Appointment(Doctor doctor, Patient patient, LocalDateTime appointmentTime, String notes) {
         this.doctor = doctor;
-        this.patientName = patientName;
+        this.patient = patient;
         this.appointmentTime = appointmentTime;
         this.notes = notes;
     }
@@ -52,12 +61,12 @@ public class Appointment {
         this.doctor = doctor;
     }
 
-    public String getPatientName() {
-        return patientName;
+    public Patient getPatient() {
+        return patient;
     }
 
-    public void setPatientName(String patientName) {
-        this.patientName = patientName;
+    public void setPatient(Patient patient) {
+        this.patient = patient;
     }
 
     public LocalDateTime getAppointmentTime() {
@@ -81,10 +90,11 @@ public class Appointment {
         return "Appointment{" +
                 "id=" + id +
                 ", doctor=" + (doctor != null ? doctor.getName() : "null") +
-                ", patientName='" + patientName + '\'' +
+                ", patient=" + (patient != null ? patient.getName() : "null") +
                 ", appointmentTime=" + appointmentTime +
                 ", notes='" + notes + '\'' +
                 '}';
     }
 }
+
 
